@@ -27,7 +27,7 @@ public class RatingsRepository
     public RatingsRepository(IApplicationPaths applicationPaths, ILogger<RatingsRepository> logger)
     {
         _logger = logger;
-        _dataPath = Path.Combine(applicationPaths.DataPath, "ratings");
+        _dataPath = Path.Combine(applicationPaths.DataPath, "jellyrate");
         _filePath = Path.Combine(_dataPath, "ratings.json");
         Directory.CreateDirectory(_dataPath);
         LoadData();
