@@ -1,9 +1,9 @@
-using Jellyfin.Plugin.Ratings.Data;
+using JellyRate.Data;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Jellyfin.Plugin.Ratings;
+namespace JellyRate;
 
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {

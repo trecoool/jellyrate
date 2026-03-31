@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mime;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.Ratings.Configuration;
-using Jellyfin.Plugin.Ratings.Data;
-using Jellyfin.Plugin.Ratings.Models;
+using JellyRate.Configuration;
+using JellyRate.Data;
+using JellyRate.Models;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Jellyfin.Plugin.Ratings.Api;
+namespace JellyRate.Api;
 
 [ApiController]
 [Route("Ratings")]

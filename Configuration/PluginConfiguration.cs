@@ -1,6 +1,6 @@
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.Ratings.Configuration;
+namespace JellyRate.Configuration;
 
 public class PluginConfiguration : BasePluginConfiguration
 {

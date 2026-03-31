@@ -5,11 +5,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.Ratings.Models;
+using JellyRate.Models;
 using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.Ratings.Data;
+namespace JellyRate.Data;
 
 public class RatingsRepository
 {

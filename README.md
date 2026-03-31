@@ -33,5 +33,5 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 ## Installation
 
 1. Build: `dotnet build -c Release`
-2. Copy `Jellyfin.Plugin.Ratings.dll` to your Jellyfin plugins directory
+2. Copy `JellyRate.dll` to your Jellyfin plugins directory
 3. Restart Jellyfin

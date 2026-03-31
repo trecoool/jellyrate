@@ -1,6 +1,6 @@
 using System;
 
-namespace Jellyfin.Plugin.Ratings.Models;
+namespace JellyRate.Models;
 
 public class UserRatingDetail
 {

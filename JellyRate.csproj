@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <RootNamespace>Jellyfin.Plugin.Ratings</RootNamespace>
-    <AssemblyName>Jellyfin.Plugin.Ratings</AssemblyName>
+    <RootNamespace>JellyRate</RootNamespace>
+    <AssemblyName>JellyRate</AssemblyName>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
