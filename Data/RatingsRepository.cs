@@ -68,7 +68,9 @@ public class RatingsRepository
             }
 
             var json = JsonSerializer.Serialize(list, _jsonOptions);
-            await File.WriteAllTextAsync(_filePath, json).ConfigureAwait(false);
+            var tempPath = _filePath + ".tmp";
+            await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
+            File.Move(tempPath, _filePath, overwrite: true);
         }
         finally
         {
