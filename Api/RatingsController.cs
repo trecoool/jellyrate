@@ -8,6 +8,7 @@ using JellyRate.Data;
 using JellyRate.Models;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
+using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,15 +22,18 @@ public class RatingsController : ControllerBase
 {
     private readonly RatingsRepository _repository;
     private readonly IUserManager _userManager;
+    private readonly ILibraryManager _libraryManager;
     private readonly IAuthorizationContext _authContext;
 
     public RatingsController(
         RatingsRepository repository,
         IUserManager userManager,
+        ILibraryManager libraryManager,
         IAuthorizationContext authContext)
     {
         _repository = repository;
         _userManager = userManager;
+        _libraryManager = libraryManager;
         _authContext = authContext;
     }
 
@@ -170,6 +174,47 @@ public class RatingsController : ControllerBase
             kvp => new { kvp.Value.AverageRating, kvp.Value.TotalRatings }
         );
         return Ok(result);
+    }
+
+    [HttpGet("RatedItems")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<List<RatedItemDto>> GetRatedItems([FromQuery] Guid? userId = null)
+    {
+        var allStats = _repository.GetAllItemStats();
+
+        // If filtering by user, only include items that user has rated
+        HashSet<Guid>? userItemIds = null;
+        if (userId.HasValue)
+        {
+            userItemIds = _repository.GetUserRatings(userId.Value)
+                .Select(r => r.ItemId)
+                .ToHashSet();
+        }
+
+        var results = new List<RatedItemDto>();
+        foreach (var (itemId, stats) in allStats)
+        {
+            if (userItemIds != null && !userItemIds.Contains(itemId))
+                continue;
+
+            var item = _libraryManager.GetItemById(itemId);
+            if (item == null)
+                continue;
+
+            results.Add(new RatedItemDto
+            {
+                ItemId = itemId,
+                Name = item.Name,
+                ProductionYear = item.ProductionYear,
+                Type = item.GetBaseItemKind().ToString(),
+                HasPrimaryImage = item.HasImage(ImageType.Primary, 0),
+                AverageRating = stats.AverageRating,
+                TotalRatings = stats.TotalRatings
+            });
+        }
+
+        results.Sort((a, b) => b.AverageRating.CompareTo(a.AverageRating));
+        return Ok(results);
     }
 
     [HttpGet("Config")]
