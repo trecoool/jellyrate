@@ -176,6 +176,22 @@ public class RatingsRepository
         }
     }
 
+    public Dictionary<Guid, (double AverageRating, int TotalRatings)> GetAllItemStats()
+    {
+        lock (_cacheLock)
+        {
+            return _ratings.Values
+                .GroupBy(r => r.ItemId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (
+                        AverageRating: Math.Round(g.Average(r => r.Rating), 2),
+                        TotalRatings: g.Count()
+                    )
+                );
+        }
+    }
+
     public async Task<bool> DeleteRatingAsync(Guid userId, Guid itemId)
     {
         bool found;

@@ -160,6 +160,18 @@ public class RatingsController : ControllerBase
         return Ok(details);
     }
 
+    [HttpGet("AllStats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult GetAllStats()
+    {
+        var stats = _repository.GetAllItemStats();
+        var result = stats.ToDictionary(
+            kvp => kvp.Key.ToString(),
+            kvp => new { kvp.Value.AverageRating, kvp.Value.TotalRatings }
+        );
+        return Ok(result);
+    }
+
     [HttpGet("Config")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult GetConfig()
@@ -171,5 +183,22 @@ public class RatingsController : ControllerBase
             config.MinRating,
             config.MaxRating
         });
+    }
+
+    [HttpGet("jellyrate.js")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetScript()
+    {
+        var assembly = typeof(RatingsController).Assembly;
+        var resourceName = "JellyRate.Web.jellyrate.js";
+        var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "application/javascript");
     }
 }
