@@ -117,7 +117,7 @@
                 font-size: 1em;
             }
 
-            /* User Rated tab content */
+            /* User Rated view content */
             .jellyrate-rated-grid {
                 display: flex;
                 flex-wrap: wrap;
@@ -125,7 +125,7 @@
                 gap: 1em;
             }
             .jellyrate-rated-card {
-                width: 150px;
+                width: 240px;
                 cursor: pointer;
                 text-decoration: none;
                 color: inherit;
@@ -135,8 +135,8 @@
                 transform: scale(1.04);
             }
             .jellyrate-rated-poster {
-                width: 150px;
-                height: 225px;
+                width: 240px;
+                height: 360px;
                 border-radius: 4px;
                 object-fit: cover;
                 background: #1a1a1a;
@@ -152,21 +152,134 @@
             }
             .jellyrate-rated-title {
                 margin-top: 6px;
-                font-size: 0.85em;
+                font-size: 0.9em;
                 line-height: 1.3;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
             .jellyrate-rated-sub {
-                font-size: 0.75em;
+                font-size: 0.8em;
                 color: rgba(255,255,255,0.5);
+                position: relative;
+                cursor: default;
             }
             .jellyrate-rated-empty {
                 padding: 2em;
                 color: rgba(255,255,255,0.5);
                 font-size: 0.95em;
             }
+
+            /* Rated view toolbar */
+            .jellyrate-toolbar {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+                padding: 0.75em 1em;
+            }
+            .jellyrate-toolbar-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 0.3em 0.8em;
+                background: rgba(255,255,255,0.08);
+                color: rgba(255,255,255,0.7);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.85em;
+                font-family: inherit;
+                white-space: nowrap;
+                transition: background 0.15s, border-color 0.15s, color 0.15s;
+            }
+            .jellyrate-toolbar-toggle.active {
+                background: rgba(230, 196, 25, 0.15);
+                color: #e6c419;
+                border-color: rgba(230, 196, 25, 0.4);
+            }
+            .jellyrate-toolbar-toggle:hover {
+                background: rgba(255,255,255,0.12);
+            }
+            .jellyrate-chips {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .jellyrate-chip {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.3em 0.8em;
+                background: rgba(230, 196, 25, 0.15);
+                color: #e6c419;
+                border: 1px solid rgba(230, 196, 25, 0.4);
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.85em;
+                font-family: inherit;
+                user-select: none;
+                transition: background 0.15s, color 0.15s, border-color 0.15s;
+            }
+            .jellyrate-chip:hover {
+                background: rgba(230, 196, 25, 0.25);
+            }
+            .jellyrate-chip.disabled {
+                background: rgba(255,255,255,0.08);
+                color: rgba(255,255,255,0.7);
+                border-color: rgba(255,255,255,0.15);
+            }
+            .jellyrate-chip.disabled:hover {
+                background: rgba(255,255,255,0.12);
+            }
+
+            /* By-user section headers */
+            .jellyrate-user-section {
+                width: 100%;
+                padding: 0.5em 1em;
+                margin-top: 0.5em;
+                font-size: 1em;
+                font-weight: bold;
+                color: rgba(255,255,255,0.8);
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+
+            /* Card tooltip (reused pattern from detail page) */
+            .jellyrate-card-tooltip {
+                position: absolute;
+                bottom: calc(100% + 4px);
+                left: 0;
+                background: rgba(20, 20, 20, 0.95);
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 6px;
+                padding: 6px 10px;
+                white-space: nowrap;
+                z-index: 100;
+                font-size: 0.85em;
+                color: rgba(255,255,255,0.85);
+                pointer-events: none;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                line-height: 1.6;
+            }
+
+            /* "User Rated" button on library pages */
+            .jellyrate-rated-btn {
+                display: block;
+                width: fit-content;
+                margin: 0.5em auto;
+                padding: 0.4em 1em;
+                background: none;
+                color: #e6c419;
+                border: none;
+                cursor: pointer;
+                font-size: 0.9em;
+                font-weight: bold;
+                font-family: inherit;
+            }
+            .jellyrate-rated-btn:hover {
+                opacity: 0.7;
+            }
+
         `;
         document.head.appendChild(style);
         stylesInjected = true;
@@ -543,11 +656,14 @@
         });
     }
 
-    // ── "User Rated" library tab ─────────────────────────────
+    // ── "User Rated" button on library pages ──────────────────
 
-    async function fetchRatedItems(userId) {
-        const qs = userId ? `?userId=${userId}` : '';
-        return apiFetch(`/Ratings/RatedItems${qs}`);
+    async function fetchRatedItems(userId, parentId) {
+        const params = new URLSearchParams();
+        if (userId) params.set('userId', userId);
+        if (parentId) params.set('parentId', parentId);
+        const qs = params.toString();
+        return apiFetch(`/Ratings/RatedItems${qs ? '?' + qs : ''}`);
     }
 
     function isLibraryPage() {
@@ -557,149 +673,308 @@
             || hash.includes('homevideos');
     }
 
-    function renderRatedCards(container, items) {
-        container.innerHTML = '';
-        if (!items || items.length === 0) {
-            container.innerHTML = '<div class="jellyrate-rated-empty">No rated items yet.</div>';
-            return;
+    function getLibraryParentId() {
+        const urlParams = new URLSearchParams(location.hash.split('?')[1] || '');
+        return urlParams.get('topParentId');
+    }
+
+    function removeRatedView() {
+        const view = document.getElementById('jellyrate-ratedView');
+        if (!view) return;
+
+        // Restore siblings we hid
+        const parent = view.parentElement;
+        if (parent) {
+            parent.querySelectorAll('[data-jellyrate-hidden]').forEach(el => {
+                el.style.display = el.getAttribute('data-jellyrate-hidden');
+                el.removeAttribute('data-jellyrate-hidden');
+            });
         }
+        view.remove();
+    }
+
+    // ── Rated view state ──────────────────────────────────
+
+    let ratedViewItems = [];
+    let ratedViewByUser = false;
+    let ratedViewEnabledUsers = {}; // userId string -> bool
+
+    function buildRatedCard(item, avgRating, totalRatings, userRatings) {
         const base = getBaseUrl();
-        const grid = document.createElement('div');
+        const card = document.createElement('a');
+        card.className = 'jellyrate-rated-card';
+        card.href = `#!/details?id=${item.ItemId}`;
+
+        if (item.HasPrimaryImage) {
+            const img = document.createElement('img');
+            img.className = 'jellyrate-rated-poster';
+            img.src = `${base}/Items/${item.ItemId}/Images/Primary?maxHeight=450&quality=90`;
+            img.alt = item.Name;
+            img.loading = 'lazy';
+            card.appendChild(img);
+        } else {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'jellyrate-rated-poster no-image';
+            placeholder.textContent = item.Name;
+            card.appendChild(placeholder);
+        }
+
+        const title = document.createElement('div');
+        title.className = 'jellyrate-rated-title';
+        title.textContent = item.Name;
+        card.appendChild(title);
+
+        const sub = document.createElement('div');
+        sub.className = 'jellyrate-rated-sub';
+        const year = item.ProductionYear ? `${item.ProductionYear} \u00b7 ` : '';
+        sub.textContent = `${year}\u2605 ${avgRating.toFixed(1)} \u00b7 ${totalRatings} vote${totalRatings !== 1 ? 's' : ''}`;
+
+        // Tooltip on hover — per-user ratings
+        if (userRatings && userRatings.length > 0) {
+            let tooltipEl = null;
+            sub.addEventListener('mouseenter', () => {
+                if (tooltipEl) tooltipEl.remove();
+                tooltipEl = document.createElement('div');
+                tooltipEl.className = 'jellyrate-card-tooltip';
+                tooltipEl.innerHTML = userRatings
+                    .slice().sort((a, b) => b.Rating - a.Rating)
+                    .map(r => `<div>${r.Rating}\u2B50 ${r.Username}</div>`)
+                    .join('');
+                sub.appendChild(tooltipEl);
+            });
+            sub.addEventListener('mouseleave', () => {
+                if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
+            });
+        }
+
+        card.appendChild(sub);
+        return card;
+    }
+
+    function getFilteredRatings(item) {
+        return (item.UserRatings || []).filter(r => ratedViewEnabledUsers[r.UserId] !== false);
+    }
+
+    function renderRatedGrid(container) {
+        let grid = container.querySelector('.jellyrate-rated-grid');
+        if (grid) grid.remove();
+        grid = document.createElement('div');
         grid.className = 'jellyrate-rated-grid';
 
-        for (const item of items) {
-            const card = document.createElement('a');
-            card.className = 'jellyrate-rated-card';
-            card.href = `#!/details?id=${item.ItemId}`;
+        const items = ratedViewItems;
+        if (!items || items.length === 0) {
+            grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items in this library.</div>';
+            container.appendChild(grid);
+            return;
+        }
 
-            if (item.HasPrimaryImage) {
-                const img = document.createElement('img');
-                img.className = 'jellyrate-rated-poster';
-                img.src = `${base}/Items/${item.ItemId}/Images/Primary?maxHeight=450&quality=90`;
-                img.alt = item.Name;
-                img.loading = 'lazy';
-                card.appendChild(img);
-            } else {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'jellyrate-rated-poster no-image';
-                placeholder.textContent = item.Name;
-                card.appendChild(placeholder);
+        if (ratedViewByUser) {
+            const userMap = new Map();
+            for (const item of items) {
+                for (const ur of (item.UserRatings || [])) {
+                    if (ratedViewEnabledUsers[ur.UserId] === false) continue;
+                    if (!userMap.has(ur.UserId)) {
+                        userMap.set(ur.UserId, { username: ur.Username, items: [] });
+                    }
+                    userMap.get(ur.UserId).items.push({ item, rating: ur.Rating });
+                }
             }
 
-            const title = document.createElement('div');
-            title.className = 'jellyrate-rated-title';
-            title.textContent = item.Name;
-            card.appendChild(title);
+            const sortedUsers = [...userMap.entries()].sort((a, b) => a[1].username.localeCompare(b[1].username));
 
-            const sub = document.createElement('div');
-            sub.className = 'jellyrate-rated-sub';
-            const year = item.ProductionYear ? `${item.ProductionYear} \u00b7 ` : '';
-            sub.textContent = `${year}\u2605 ${item.AverageRating.toFixed(1)} \u00b7 ${item.TotalRatings} vote${item.TotalRatings !== 1 ? 's' : ''}`;
-            card.appendChild(sub);
+            if (sortedUsers.length === 0) {
+                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
+            } else {
+                for (const [, userData] of sortedUsers) {
+                    const header = document.createElement('div');
+                    header.className = 'jellyrate-user-section';
+                    header.textContent = userData.username;
+                    grid.appendChild(header);
 
-            grid.appendChild(card);
+                    userData.items.sort((a, b) => b.rating - a.rating);
+                    for (const { item, rating } of userData.items) {
+                        grid.appendChild(buildRatedCard(item, rating, 1, [{ Username: userData.username, Rating: rating }]));
+                    }
+                }
+            }
+        } else {
+            const filtered = [];
+            for (const item of items) {
+                const ratings = getFilteredRatings(item);
+                if (ratings.length === 0) continue;
+                const avg = ratings.reduce((s, r) => s + r.Rating, 0) / ratings.length;
+                filtered.push({ item, avg, total: ratings.length, ratings });
+            }
+            filtered.sort((a, b) => b.avg - a.avg);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
+            } else {
+                for (const { item, avg, total, ratings } of filtered) {
+                    grid.appendChild(buildRatedCard(item, avg, total, ratings));
+                }
+            }
         }
+
         container.appendChild(grid);
     }
 
-    function tryInjectRatedTab() {
-        if (!isLibraryPage()) return;
+    function renderRatedToolbar(container) {
+        if (container.querySelector('.jellyrate-toolbar')) return;
+        const toolbar = document.createElement('div');
+        toolbar.className = 'jellyrate-toolbar';
 
-        const tabStrip = document.querySelector('.emby-tabs-slider');
-        const page = document.querySelector('.page.libraryPage');
-        if (!tabStrip || !page) return;
+        // "By user" toggle
+        const toggle = document.createElement('button');
+        toggle.className = 'jellyrate-toolbar-toggle';
+        toggle.type = 'button';
+        toggle.textContent = 'By user';
+        toggle.addEventListener('click', () => {
+            ratedViewByUser = !ratedViewByUser;
+            toggle.classList.toggle('active', ratedViewByUser);
+            renderRatedGrid(container);
+        });
+        toolbar.appendChild(toggle);
 
-        // Already injected in this tab strip
-        if (tabStrip.querySelector('[data-jellyrate-tab]')) return;
+        // User chips
+        const chipsContainer = document.createElement('div');
+        chipsContainer.className = 'jellyrate-chips';
 
-        // Find the emby-tabs parent (custom element that manages tab state)
-        const embyTabs = tabStrip.closest('[is="emby-tabs"]') || tabStrip.parentElement;
+        const userMap = new Map();
+        for (const item of ratedViewItems) {
+            for (const ur of (item.UserRatings || [])) {
+                if (!userMap.has(ur.UserId)) userMap.set(ur.UserId, ur.Username);
+            }
+        }
+        const sortedUsers = [...userMap.entries()].sort((a, b) => a[1].localeCompare(b[1]));
 
-        // Create tab button matching Jellyfin's structure
-        const tabBtn = document.createElement('button');
-        tabBtn.type = 'button';
-        tabBtn.className = 'emby-tab-button';
-        tabBtn.setAttribute('data-jellyrate-tab', '1');
-        tabBtn.innerHTML = '<div class="emby-button-foreground">User Rated</div>';
-        tabBtn.style.cssText = 'color:#e6c419; background:transparent; border:none; outline:none; box-shadow:none;';
-        tabStrip.appendChild(tabBtn);
+        for (const [userId, username] of sortedUsers) {
+            if (ratedViewEnabledUsers[userId] === undefined) ratedViewEnabledUsers[userId] = true;
 
-        // Content panel — positioned over the native content area
-        const contentPanel = document.createElement('div');
-        contentPanel.id = 'jellyrate-ratedTab';
-        contentPanel.style.cssText = 'display:none; position:relative; z-index:10; background:inherit; min-height:300px;';
-        page.appendChild(contentPanel);
+            const chip = document.createElement('button');
+            chip.className = 'jellyrate-chip' + (ratedViewEnabledUsers[userId] ? '' : ' disabled');
+            chip.type = 'button';
+            chip.textContent = username;
+            chip.dataset.userId = userId;
 
-        let loaded = false;
-        let isActive = false;
-
-        function showPanel() {
-            isActive = true;
-            // Hide all native .pageTabContent panels
-            page.querySelectorAll('.pageTabContent').forEach(p => {
-                p.dataset.jellyrateHidden = p.style.display;
-                p.style.display = 'none';
+            chip.addEventListener('click', () => {
+                ratedViewEnabledUsers[userId] = !ratedViewEnabledUsers[userId];
+                chip.classList.toggle('disabled', !ratedViewEnabledUsers[userId]);
+                renderRatedGrid(container);
             });
-            contentPanel.style.display = '';
 
-            // Deselect all native tabs, select ours
-            tabStrip.querySelectorAll('.emby-tab-button').forEach(b => {
-                b.classList.remove('is-active', 'emby-tab-button-active');
+            chip.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const allOthersOff = sortedUsers.every(([id]) => id === userId || ratedViewEnabledUsers[id] === false);
+                for (const [id] of sortedUsers) {
+                    ratedViewEnabledUsers[id] = allOthersOff ? true : (id === userId);
+                }
+                chipsContainer.querySelectorAll('.jellyrate-chip').forEach(c => {
+                    c.classList.toggle('disabled', ratedViewEnabledUsers[c.dataset.userId] === false);
+                });
+                renderRatedGrid(container);
             });
-            tabBtn.classList.add('is-active', 'emby-tab-button-active');
+
+            chipsContainer.appendChild(chip);
         }
 
-        function hidePanel() {
-            if (!isActive) return;
-            isActive = false;
-            contentPanel.style.display = 'none';
-            tabBtn.classList.remove('is-active', 'emby-tab-button-active');
+        toolbar.appendChild(chipsContainer);
+        container.insertBefore(toolbar, container.firstChild);
+    }
 
-            // Restore native panels to their pre-hidden state
-            page.querySelectorAll('.pageTabContent').forEach(p => {
-                if (p.dataset.jellyrateHidden !== undefined) {
-                    p.style.display = p.dataset.jellyrateHidden;
-                    delete p.dataset.jellyrateHidden;
-                }
-            });
-        }
+    async function showRatedView(parentId) {
+        removeRatedView();
 
-        // Click our tab
-        tabBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
+        if (!activeTab) return;
 
-            showPanel();
-
-            if (!loaded) {
-                contentPanel.innerHTML = '<div class="jellyrate-rated-empty">Loading...</div>';
-                try {
-                    const items = await fetchRatedItems();
-                    renderRatedCards(contentPanel, items);
-                    loaded = true;
-                } catch (err) {
-                    contentPanel.innerHTML = `<div class="jellyrate-rated-empty">Failed to load: ${err.message}</div>`;
-                }
+        // Hide all native siblings (button, filter bar, card grid) within this tab
+        Array.from(activeTab.children).forEach(child => {
+            if (child.id !== 'jellyrate-ratedView') {
+                child.setAttribute('data-jellyrate-hidden', child.style.display || '');
+                child.style.display = 'none';
             }
         });
 
-        // When Jellyfin activates a native tab, hide our panel
-        if (embyTabs) {
-            embyTabs.addEventListener('tabchange', () => hidePanel());
-            embyTabs.addEventListener('beforetabchange', () => hidePanel());
+        const view = document.createElement('div');
+        view.id = 'jellyrate-ratedView';
+        view.innerHTML = '<div class="jellyrate-rated-empty">Loading...</div>';
+        activeTab.appendChild(view);
+
+        try {
+            const items = await fetchRatedItems(null, parentId);
+            ratedViewItems = items || [];
+            ratedViewByUser = false;
+            ratedViewEnabledUsers = {};
+            view.innerHTML = '';
+            renderRatedToolbar(view);
+            renderRatedGrid(view);
+        } catch (err) {
+            view.innerHTML = `<div class="jellyrate-rated-empty">Failed to load: ${err.message}</div>`;
         }
     }
 
-    // Watch for Jellyfin rebuilding the tab strip (SPA navigation)
-    function setupTabObserver() {
-        const observer = new MutationObserver(() => {
-            if (!isLibraryPage()) return;
-            const tabStrip = document.querySelector('.emby-tabs-slider');
-            if (tabStrip && !tabStrip.querySelector('[data-jellyrate-tab]')) {
-                tryInjectRatedTab();
-            }
+    async function tryInjectRatedButton() {
+        if (!isLibraryPage()) return;
+        const cfg = await fetchConfig();
+        if (!cfg || cfg.DisableUserRatedTab) return;
+
+        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
+        if (!activeTab) return;
+        if (activeTab.querySelector('.jellyrate-rated-btn')) return;
+
+        // Only show button if there are rated items anywhere
+        try {
+            const stats = await fetchAllStats();
+            if (!stats || Object.keys(stats).length === 0) return;
+        } catch { return; }
+
+        const btn = document.createElement('button');
+        btn.className = 'jellyrate-rated-btn';
+        btn.type = 'button';
+        btn.textContent = '\u2B50 User Rated';
+
+        // Insert before .itemsContainer (between filter bar and content grid)
+        const itemsContainer = activeTab.querySelector('.itemsContainer');
+        if (itemsContainer) {
+            itemsContainer.parentElement.insertBefore(btn, itemsContainer);
+        } else {
+            activeTab.insertBefore(btn, activeTab.firstChild);
+        }
+
+        btn.addEventListener('click', () => {
+            const parentId = getLibraryParentId();
+            history.pushState({ jellyrate: 'rated', parentId }, '');
+            showRatedView(parentId);
         });
-        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // Single polling function — checks every POLL_INTERVAL whether button
+    // needs injection and whether rated view should be shown/hidden.
+    // Self-healing: if DOM isn't ready, just retries next tick.
+    async function checkRatedButton() {
+        if (!isLibraryPage()) {
+            removeRatedView();
+            return;
+        }
+
+        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
+        if (!activeTab) return;
+
+        // Inject button if missing
+        if (!activeTab.querySelector('.jellyrate-rated-btn')) {
+            await tryInjectRatedButton();
+        }
+
+        // Show or hide rated view based on history state
+        const shouldShow = history.state?.jellyrate === 'rated';
+        const isShown = !!document.getElementById('jellyrate-ratedView');
+
+        if (shouldShow && !isShown) {
+            showRatedView(history.state.parentId);
+        } else if (!shouldShow && isShown) {
+            removeRatedView();
+        }
     }
 
     // ── SPA Navigation Detection ────────────────────────────
@@ -735,8 +1010,19 @@
         setupCardObserver();
         scheduleCardProcessing();
 
-        // "User Rated" tab — observer re-injects whenever Jellyfin rebuilds the tab strip
-        setupTabObserver();
+        // "User Rated" button — poll + event-driven checks
+        window.addEventListener('hashchange', checkRatedButton);
+        window.addEventListener('popstate', checkRatedButton);
+        setInterval(checkRatedButton, POLL_INTERVAL);
+        checkRatedButton();
+
+        // Any tab button click exits rated view (delegated — works even if tab strip rebuilds)
+        document.addEventListener('click', (e) => {
+            if (document.getElementById('jellyrate-ratedView') && e.target.closest('.emby-tab-button')) {
+                history.replaceState(null, '');
+                removeRatedView();
+            }
+        });
     }
 
     function waitForApiClient() {

@@ -178,7 +178,7 @@ public class RatingsController : ControllerBase
 
     [HttpGet("RatedItems")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<List<RatedItemDto>> GetRatedItems([FromQuery] Guid? userId = null)
+    public ActionResult<List<RatedItemDto>> GetRatedItems([FromQuery] Guid? userId = null, [FromQuery] Guid? parentId = null)
     {
         var allStats = _repository.GetAllItemStats();
 
@@ -201,6 +201,40 @@ public class RatingsController : ControllerBase
             if (item == null)
                 continue;
 
+            // Filter by library — topParentId from URL may be a UserView or CollectionFolder
+            if (parentId.HasValue)
+            {
+                var collectionFolders = _libraryManager.GetCollectionFolders(item);
+                bool inLibrary = collectionFolders.Any(cf => cf.Id == parentId.Value);
+
+                // If parentId is a UserView, resolve to its underlying CollectionFolder
+                if (!inLibrary)
+                {
+                    var parentItem = _libraryManager.GetItemById(parentId.Value);
+                    if (parentItem != null)
+                    {
+                        var parentCfs = _libraryManager.GetCollectionFolders(parentItem);
+                        var parentCfIds = parentCfs.Select(cf => cf.Id).ToHashSet();
+                        inLibrary = collectionFolders.Any(cf => parentCfIds.Contains(cf.Id));
+                    }
+                }
+
+                if (!inLibrary)
+                    continue;
+            }
+
+            var itemRatings = _repository.GetItemRatings(itemId);
+            var userRatings = itemRatings.Select(r =>
+            {
+                var user = _userManager.GetUserById(r.UserId);
+                return new RatedItemUserRating
+                {
+                    UserId = r.UserId,
+                    Username = user?.Username ?? "Unknown",
+                    Rating = r.Rating
+                };
+            }).ToList();
+
             results.Add(new RatedItemDto
             {
                 ItemId = itemId,
@@ -209,7 +243,8 @@ public class RatingsController : ControllerBase
                 Type = item.GetBaseItemKind().ToString(),
                 HasPrimaryImage = item.HasImage(ImageType.Primary, 0),
                 AverageRating = stats.AverageRating,
-                TotalRatings = stats.TotalRatings
+                TotalRatings = stats.TotalRatings,
+                UserRatings = userRatings
             });
         }
 
@@ -226,7 +261,8 @@ public class RatingsController : ControllerBase
         {
             config.EnableRatings,
             config.MinRating,
-            config.MaxRating
+            config.MaxRating,
+            config.DisableUserRatedTab
         });
     }
 

@@ -19,6 +19,13 @@
                             </label>
                         </div>
 
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="DisableUserRatedTab" name="DisableUserRatedTab" type="checkbox" is="emby-checkbox" />
+                                <span>Disable "User Rated" library tab</span>
+                            </label>
+                        </div>
+
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="MinRating">Minimum Rating</label>
                             <input id="MinRating" name="MinRating" type="number" is="emby-input"
@@ -51,6 +58,7 @@
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(RatingsConfig.pluginUniqueId).then(function (config) {
                         document.querySelector('#EnableRatings').checked = config.EnableRatings;
+                        document.querySelector('#DisableUserRatedTab').checked = config.DisableUserRatedTab;
                         document.querySelector('#MinRating').value = config.MinRating;
                         document.querySelector('#MaxRating').value = config.MaxRating;
                         Dashboard.hideLoadingMsg();
@@ -63,6 +71,7 @@
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(RatingsConfig.pluginUniqueId).then(function (config) {
                         config.EnableRatings = document.querySelector('#EnableRatings').checked;
+                        config.DisableUserRatedTab = document.querySelector('#DisableUserRatedTab').checked;
                         config.MinRating = parseInt(document.querySelector('#MinRating').value, 10);
                         config.MaxRating = parseInt(document.querySelector('#MaxRating').value, 10);
                         ApiClient.updatePluginConfiguration(RatingsConfig.pluginUniqueId, config).then(function () {

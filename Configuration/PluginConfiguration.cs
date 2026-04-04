@@ -9,4 +9,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public int MinRating { get; set; } = 1;
 
     public int MaxRating { get; set; } = 10;
+
+    public bool DisableUserRatedTab { get; set; } = false;
 }

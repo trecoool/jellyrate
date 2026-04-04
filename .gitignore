@@ -5,3 +5,5 @@ obj/
 .vs/
 *.DotSettings.user
 PLAN.md
+CLAUDE.md
+_claude/

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace JellyRate.Models;
 
@@ -17,4 +18,15 @@ public class RatedItemDto
     public double AverageRating { get; set; }
 
     public int TotalRatings { get; set; }
+
+    public List<RatedItemUserRating> UserRatings { get; set; } = new();
+}
+
+public class RatedItemUserRating
+{
+    public Guid UserId { get; set; }
+
+    public string Username { get; set; } = string.Empty;
+
+    public int Rating { get; set; }
 }
