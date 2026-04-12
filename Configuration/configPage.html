@@ -14,6 +14,13 @@
 
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
+                                <input id="ShowInAdminMenu" name="ShowInAdminMenu" type="checkbox" is="emby-checkbox" />
+                                <span>Show in admin sidebar menu (requires restart)</span>
+                            </label>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
                                 <input id="EnableRatings" name="EnableRatings" type="checkbox" is="emby-checkbox" />
                                 <span>Enable Ratings</span>
                             </label>
@@ -57,6 +64,7 @@
                 .addEventListener('pageshow', function () {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(RatingsConfig.pluginUniqueId).then(function (config) {
+                        document.querySelector('#ShowInAdminMenu').checked = config.ShowInAdminMenu;
                         document.querySelector('#EnableRatings').checked = config.EnableRatings;
                         document.querySelector('#DisableUserRatedTab').checked = config.DisableUserRatedTab;
                         document.querySelector('#MinRating').value = config.MinRating;
@@ -70,6 +78,7 @@
                     e.preventDefault();
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(RatingsConfig.pluginUniqueId).then(function (config) {
+                        config.ShowInAdminMenu = document.querySelector('#ShowInAdminMenu').checked;
                         config.EnableRatings = document.querySelector('#EnableRatings').checked;
                         config.DisableUserRatedTab = document.querySelector('#DisableUserRatedTab').checked;
                         config.MinRating = parseInt(document.querySelector('#MinRating').value, 10);

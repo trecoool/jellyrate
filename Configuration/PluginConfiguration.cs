@@ -4,6 +4,8 @@ namespace JellyRate.Configuration;
 
 public class PluginConfiguration : BasePluginConfiguration
 {
+    public bool ShowInAdminMenu { get; set; } = true;
+
     public bool EnableRatings { get; set; } = true;
 
     public int MinRating { get; set; } = 1;
