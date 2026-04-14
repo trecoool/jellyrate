@@ -2,15 +2,13 @@
 
 A Jellyfin plugin that lets users rate media items (1-10 stars) and view aggregate statistics.
 
-This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](https://github.com/K3ntas/jellyfin-plugin-ratings), which bundles ratings, media requests, and several other features into a single monolithic plugin. JellyRate isolates the ratings functionality into a clean, standalone plugin with a focused codebase.
+This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](https://github.com/K3ntas/jellyfin-plugin-ratings) focusing solely on the rating system.
 
 ## Features
 
 - Rate any media item (configurable scale, default 1-10)
-- View aggregate stats: average rating, total count, distribution
-- Per-user rating history
-- Detailed ratings with usernames
-- Admin configuration page
+- See other users' ratings on library items
+- User ratings page : see library items ordered by ratings, aggregated or per user
 
 ## Requirements
 
@@ -32,6 +30,17 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 
 ## Installation
 
-1. Build: `dotnet build -c Release`
-2. Copy `JellyRate.dll` to your Jellyfin plugins directory
-3. Restart Jellyfin
+### Via plugin repository (recommended)
+
+1. In Jellyfin, go to **Dashboard → Plugins → Repositories**.
+2. Click **+** and add:
+   - **Name**: `JellyRate`
+   - **URL**: `https://raw.githubusercontent.com/trecoool/jellyrate/master/manifest.json`
+3. Open the **Catalog** tab, find **JellyRate**, and install it.
+4. Restart Jellyfin.
+
+### Manual install
+
+1. Download the latest `JellyRate.zip` from the [Releases](https://github.com/trecoool/jellyrate/releases) page.
+2. Extract `JellyRate.dll` to `<jellyfin-config>/plugins/JellyRate/`.
+3. Restart Jellyfin.
