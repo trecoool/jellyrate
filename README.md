@@ -2,7 +2,13 @@
 
 A Jellyfin plugin that lets users rate media items (1-10 stars) and view aggregate statistics.
 
-This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](https://github.com/K3ntas/jellyfin-plugin-ratings) focusing solely on the rating system.
+This plugin is a rewriting of [K3ntas/jellyfin-plugin-ratings](https://github.com/K3ntas/jellyfin-plugin-ratings) focusing solely on the rating system.
+
+## Disclaimer
+
+I'm a gamedev, not a web dev. This plugin is entirely vibe-coded. Efforts are made to ensure the high level logic is sound, and i use it on my homelab setup. It works reliably for me, but the code may not follow best practices convention regarding Jellyfin plugins or the web in general. Issues and PRs welcome.
+
+Check out my other plugin that handles media requests: [JellyRequest](https://github.com/trecoool/jellyrequest).
 
 ## Features
 
