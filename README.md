@@ -6,7 +6,7 @@ This plugin is a rewriting of [K3ntas/jellyfin-plugin-ratings](https://github.co
 
 ## Disclaimer
 
-I'm a gamedev, not a web dev. This plugin is entirely vibe-coded. Efforts are made to ensure the high level logic is sound, and i use it on my homelab setup. It works reliably for me, but the code may not follow best practices convention regarding Jellyfin plugins or the web in general. Issues and PRs welcome.
+I'm a gamedev, not a webdev. This plugin is entirely vibe-coded. Despite my best efforts to ensure that what happens is sound, the code may not follow best practices convention regarding Jellyfin plugins or the web in general. Issues and PRs welcome. I use it and test it regularly on my homelab setup, it works reliably for me.
 
 Check out my other plugin that handles media requests: [JellyRequest](https://github.com/trecoool/jellyrequest).
 
