@@ -26,25 +26,20 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 | POST | `/Ratings/Items/{itemId}/Rating?rating=N` | Set or update your rating |
 | GET | `/Ratings/Items/{itemId}/Stats` | Aggregate stats (optional auth) |
 | GET | `/Ratings/Items/{itemId}/UserRating` | Your rating for an item |
+| GET | `/Ratings/Items/{itemId}/DetailedRatings` | All ratings with usernames |
 | GET | `/Ratings/Users/{userId}/Ratings` | All ratings by a user |
 | GET | `/Ratings/MyRatings` | All your ratings |
+| GET | `/Ratings/AllStats` | Stats for every rated item |
+| GET | `/Ratings/RatedItems` | All items rated, with per-user breakdown |
 | DELETE | `/Ratings/Items/{itemId}/Rating` | Delete your rating |
-| GET | `/Ratings/Items/{itemId}/DetailedRatings` | All ratings with usernames |
 | GET | `/Ratings/Config` | Plugin configuration |
 
 ## Installation
 
-### Via plugin repository (recommended)
+Build from source and copy the DLL into Jellyfin's plugin folder:
 
-1. In Jellyfin, go to **Dashboard → Plugins → Repositories**.
-2. Click **+** and add:
-   - **Name**: `JellyRate`
-   - **URL**: `https://raw.githubusercontent.com/trecoool/jellyrate/master/manifest.json`
-3. Open the **Catalog** tab, find **JellyRate**, and install it.
-4. Restart Jellyfin.
+```bash
+dotnet build -c Release
+```
 
-### Manual install
-
-1. Download the latest `JellyRate.zip` from the [Releases](https://github.com/trecoool/jellyrate/releases) page.
-2. Extract `JellyRate.dll` to `<jellyfin-config>/plugins/JellyRate/`.
-3. Restart Jellyfin.
+Copy `bin/Release/net9.0/JellyRate.dll` to `<jellyfin-config>/plugins/JellyRate/`, then restart Jellyfin.
