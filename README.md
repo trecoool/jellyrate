@@ -12,7 +12,7 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 
 ## Screenshots
 
-![Rating widget on the movie detail page](screenshots/movie-page.png)
+![Rating widget on the movie detail page](Screenshots/movie-page.png)
 
 ## Requirements
 
