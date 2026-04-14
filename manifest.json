@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "f3b5e142-7a68-4d5c-9b3a-1e8f6c4d2a09",
+    "name": "JellyRate",
+    "description": "Users rate media items and view aggregate statistics.",
+    "overview": "A Jellyfin plugin for user ratings: configurable 1-10 scale, per-user and aggregated views, library browsing by rating.",
+    "owner": "trecoool",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/trecoool/jellyrate/releases/download/v1.0.0.0/jellyrate_1.0.0.0.zip",
+        "checksum": "f537dc3ebc5702c42980cbb151a10fcf",
+        "timestamp": "2026-04-13T00:00:00Z"
+      }
+    ]
+  }
+]

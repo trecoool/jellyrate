@@ -36,7 +36,22 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 
 ## Installation
 
-Build from source and copy the DLL into Jellyfin's plugin folder:
+### Via plugin repository (recommended)
+
+1. In Jellyfin, go to **Dashboard → Plugins → Repositories**.
+2. Click **+** and add:
+   - **Name**: `JellyRate`
+   - **URL**: `https://raw.githubusercontent.com/trecoool/jellyrate/master/manifest.json`
+3. Open the **Catalog** tab, find **JellyRate**, and install it.
+4. Restart Jellyfin.
+
+### Manual install
+
+1. Download `jellyrate_1.0.0.0.zip` from the [Releases](https://github.com/trecoool/jellyrate/releases) page.
+2. Extract `JellyRate.dll` to `<jellyfin-config>/plugins/JellyRate/`.
+3. Restart Jellyfin.
+
+### Build from source
 
 ```bash
 dotnet build -c Release
