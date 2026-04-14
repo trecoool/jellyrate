@@ -10,6 +10,10 @@ This project is extracted and rewritten from [K3ntas/jellyfin-plugin-ratings](ht
 - See other users' ratings on library items
 - User ratings page : see library items ordered by ratings, aggregated or per user
 
+## Screenshots
+
+![Rating widget on the movie detail page](screenshots/movie-page.png)
+
 ## Requirements
 
 - Jellyfin 10.11.x
