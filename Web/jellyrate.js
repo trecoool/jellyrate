@@ -119,13 +119,12 @@
 
             /* User Rated view content */
             .jellyrate-rated-grid {
-                display: flex;
-                flex-wrap: wrap;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
                 padding: 1em;
                 gap: 1em;
             }
             .jellyrate-rated-card {
-                width: 240px;
                 cursor: pointer;
                 text-decoration: none;
                 color: inherit;
@@ -135,8 +134,8 @@
                 transform: scale(1.04);
             }
             .jellyrate-rated-poster {
-                width: 240px;
-                height: 360px;
+                width: 100%;
+                aspect-ratio: 2 / 3;
                 border-radius: 4px;
                 object-fit: cover;
                 background: #1a1a1a;
@@ -235,7 +234,7 @@
 
             /* By-user section headers */
             .jellyrate-user-section {
-                width: 100%;
+                grid-column: 1 / -1;
                 padding: 0.5em 1em;
                 margin-top: 0.5em;
                 font-size: 1em;
@@ -696,7 +695,7 @@
     // ── Rated view state ──────────────────────────────────
 
     let ratedViewItems = [];
-    let ratedViewByUser = false;
+    let ratedViewAggregate = false;
     let ratedViewEnabledUsers = {}; // userId string -> bool
 
     function buildRatedCard(item, avgRating, totalRatings, userRatings) {
@@ -768,7 +767,24 @@
             return;
         }
 
-        if (ratedViewByUser) {
+        if (ratedViewAggregate) {
+            const filtered = [];
+            for (const item of items) {
+                const ratings = getFilteredRatings(item);
+                if (ratings.length === 0) continue;
+                const avg = ratings.reduce((s, r) => s + r.Rating, 0) / ratings.length;
+                filtered.push({ item, avg, total: ratings.length, ratings });
+            }
+            filtered.sort((a, b) => b.avg - a.avg);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
+            } else {
+                for (const { item, avg, total, ratings } of filtered) {
+                    grid.appendChild(buildRatedCard(item, avg, total, ratings));
+                }
+            }
+        } else {
             const userMap = new Map();
             for (const item of items) {
                 for (const ur of (item.UserRatings || [])) {
@@ -797,23 +813,6 @@
                     }
                 }
             }
-        } else {
-            const filtered = [];
-            for (const item of items) {
-                const ratings = getFilteredRatings(item);
-                if (ratings.length === 0) continue;
-                const avg = ratings.reduce((s, r) => s + r.Rating, 0) / ratings.length;
-                filtered.push({ item, avg, total: ratings.length, ratings });
-            }
-            filtered.sort((a, b) => b.avg - a.avg);
-
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
-            } else {
-                for (const { item, avg, total, ratings } of filtered) {
-                    grid.appendChild(buildRatedCard(item, avg, total, ratings));
-                }
-            }
         }
 
         container.appendChild(grid);
@@ -824,14 +823,14 @@
         const toolbar = document.createElement('div');
         toolbar.className = 'jellyrate-toolbar';
 
-        // "By user" toggle
+        // "Aggregate" toggle
         const toggle = document.createElement('button');
         toggle.className = 'jellyrate-toolbar-toggle';
         toggle.type = 'button';
-        toggle.textContent = 'By user';
+        toggle.textContent = 'Aggregate';
         toggle.addEventListener('click', () => {
-            ratedViewByUser = !ratedViewByUser;
-            toggle.classList.toggle('active', ratedViewByUser);
+            ratedViewAggregate = !ratedViewAggregate;
+            toggle.classList.toggle('active', ratedViewAggregate);
             renderRatedGrid(container);
         });
         toolbar.appendChild(toggle);
@@ -904,7 +903,7 @@
         try {
             const items = await fetchRatedItems(null, parentId);
             ratedViewItems = items || [];
-            ratedViewByUser = false;
+            ratedViewAggregate = false;
             ratedViewEnabledUsers = {};
             view.innerHTML = '';
             renderRatedToolbar(view);
