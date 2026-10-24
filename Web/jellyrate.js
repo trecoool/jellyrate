@@ -108,7 +108,7 @@
                 font-weight: 700;
                 padding: 2px 6px;
                 border-radius: 4px;
-                z-index: 1;
+                z-index: 2;
                 display: flex;
                 align-items: center;
                 gap: 3px;
@@ -369,8 +369,9 @@
         entry.el = el;
     }
 
-    function attachRatingsTooltip(anchorEl, loadRatings) {
-        anchorEl.classList.add('jellyrate-tooltip-anchor');
+    // anchorEl: mouse hover zone + popover position; tapEl: click/tap toggle (defaults to anchorEl)
+    function attachRatingsTooltip(anchorEl, loadRatings, tapEl = anchorEl) {
+        tapEl.classList.add('jellyrate-tooltip-anchor');
         anchorEl.addEventListener('pointerenter', (e) => {
             if (e.pointerType === 'mouse') showRatingsTooltip(anchorEl, loadRatings, true);
         });
@@ -378,7 +379,7 @@
             if (e.pointerType === 'mouse' && openTooltip?.anchor === anchorEl) closeRatingsTooltip();
         });
         // Click must not reach the card link underneath (would navigate instead of showing the popover)
-        anchorEl.addEventListener('click', (e) => {
+        tapEl.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             if (openTooltip?.anchor !== anchorEl) showRatingsTooltip(anchorEl, loadRatings, false);
@@ -628,8 +629,9 @@
 
             if (!itemStats || itemStats.TotalRatings === 0) return;
 
-            // Find the card's image container to position the badge
-            const imgContainer = card.querySelector('.cardImageContainer') || card.querySelector('.cardBox') || card;
+            // Badge goes in .cardScalable, after Jellyfin's hover overlay: inside .cardImageContainer
+            // (contain: strict) it would be trapped under the overlay's darkening and pointer layer
+            const imgContainer = card.querySelector('.cardScalable') || card.querySelector('.cardBox') || card;
 
             // Don't add duplicate badge
             if (imgContainer.querySelector('.jellyrate-card-badge')) return;
@@ -641,7 +643,9 @@
             const badge = document.createElement('div');
             badge.className = 'jellyrate-card-badge';
             badge.innerHTML = `<span class="star">\u2605</span> ${itemStats.AverageRating.toFixed(1)}`;
-            attachRatingsTooltip(badge, () => fetchDetailedRatingsCached(itemId));
+            // Mouse: hover anywhere on the card; touch: tap the badge
+            const hoverZone = card.querySelector('.cardBox') || card;
+            attachRatingsTooltip(hoverZone, () => fetchDetailedRatingsCached(itemId), badge);
             imgContainer.appendChild(badge);
         });
     }
