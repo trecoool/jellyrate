@@ -9,7 +9,7 @@
     "versions": [
       {
         "version": "1.0.1.0",
-        "changelog": "Changes since 1.0.0.0:\n- Library cards: hover a card to see who rated it and how; on mobile, tap the rating badge.\n- The rating badge stays visible on top of Jellyfin's dark hover overlay.\n- The per-user popover also opens on tap (item page, User Rated view) and lists ratings highest first.\n- Uses the standard Authorization header instead of the legacy X-Emby-Authorization.",
+        "changelog": "- Library cards: hover a card to see who rated it and how; on mobile, tap the rating badge.\n- The rating badge stays visible on top of Jellyfin's dark hover overlay.\n- The per-user popover also opens on tap (item page, User Rated view) and lists ratings highest first.\n- Uses the standard Authorization header instead of the legacy X-Emby-Authorization.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/trecoool/jellyrate/releases/download/v1.0.1.0/jellyrate_1.0.1.0.zip",
         "checksum": "d17d3d87af7081713387c081432020a3",
