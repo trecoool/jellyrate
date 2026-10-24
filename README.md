@@ -53,7 +53,7 @@ Check out my other plugin that handles media requests: [JellyRequest](https://gi
 
 ### Manual install
 
-1. Download `jellyrate_1.0.0.0.zip` from the [Releases](https://github.com/trecoool/jellyrate/releases) page.
+1. Download the latest `jellyrate_<version>.zip` from the [Releases](https://github.com/trecoool/jellyrate/releases) page.
 2. Extract `JellyRate.dll` to `<jellyfin-config>/plugins/JellyRate/`.
 3. Restart Jellyfin.
 
