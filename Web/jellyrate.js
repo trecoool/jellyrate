@@ -14,6 +14,7 @@
     let allStatsCache = null;
     let allStatsCacheTime = 0;
     const STATS_CACHE_TTL = 60000; // 1 minute
+    const detailedRatingsCache = new Map(); // itemId -> [{ Rating, Username }]
 
     // ── Styles ──────────────────────────────────────────────
 
@@ -55,16 +56,17 @@
                 color: rgba(255,255,255,0.6);
                 font-size: 0.9em;
             }
+            .jellyrate-tooltip-anchor {
+                cursor: pointer;
+            }
             .jellyrate-tooltip {
-                position: absolute;
-                bottom: calc(100% + 6px);
-                left: 0;
+                position: fixed;
                 background: rgba(20, 20, 20, 0.95);
                 border: 1px solid rgba(255,255,255,0.15);
                 border-radius: 6px;
                 padding: 6px 10px;
                 white-space: nowrap;
-                z-index: 100;
+                z-index: 10000;
                 font-size: 0.85em;
                 color: rgba(255,255,255,0.85);
                 pointer-events: none;
@@ -106,7 +108,6 @@
                 font-weight: 700;
                 padding: 2px 6px;
                 border-radius: 4px;
-                pointer-events: none;
                 z-index: 1;
                 display: flex;
                 align-items: center;
@@ -243,24 +244,6 @@
                 border-bottom: 1px solid rgba(255,255,255,0.1);
             }
 
-            /* Card tooltip (reused pattern from detail page) */
-            .jellyrate-card-tooltip {
-                position: absolute;
-                bottom: calc(100% + 4px);
-                left: 0;
-                background: rgba(20, 20, 20, 0.95);
-                border: 1px solid rgba(255,255,255,0.15);
-                border-radius: 6px;
-                padding: 6px 10px;
-                white-space: nowrap;
-                z-index: 100;
-                font-size: 0.85em;
-                color: rgba(255,255,255,0.85);
-                pointer-events: none;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-                line-height: 1.6;
-            }
-
             /* "User Rated" button on library pages */
             .jellyrate-rated-btn {
                 display: block;
@@ -311,7 +294,7 @@
         const base = getBaseUrl();
         const auth = getAuthHeader();
         const headers = { ...(options.headers || {}) };
-        if (auth) headers['X-Emby-Authorization'] = auth;
+        if (auth) headers.Authorization = auth;
         if (options.body) headers['Content-Type'] = 'application/json';
         const resp = await fetch(`${base}${path}`, { ...options, headers });
         if (!resp.ok) throw new Error(`API ${resp.status}`);
@@ -343,7 +326,69 @@
     function invalidateStatsCache() {
         allStatsCache = null;
         allStatsCacheTime = 0;
+        detailedRatingsCache.clear();
     }
+
+    async function fetchDetailedRatingsCached(itemId) {
+        if (!detailedRatingsCache.has(itemId)) detailedRatingsCache.set(itemId, await fetchDetailedRatings(itemId));
+        return detailedRatingsCache.get(itemId);
+    }
+
+    // ── Per-user ratings popover (hover with mouse, tap/click toggles) ──
+
+    let openTooltip = null; // { anchor, el, viaHover }
+
+    function closeRatingsTooltip() {
+        if (!openTooltip) return;
+        if (openTooltip.el) openTooltip.el.remove();
+        openTooltip = null;
+    }
+
+    // Lives on <body> with fixed position so overflow:hidden card containers can't clip it
+    async function showRatingsTooltip(anchorEl, loadRatings, viaHover) {
+        closeRatingsTooltip();
+        const entry = { anchor: anchorEl, el: null, viaHover };
+        openTooltip = entry;
+        let ratings;
+        try { ratings = await loadRatings(); } catch { ratings = null; }
+        if (openTooltip !== entry || !ratings || ratings.length === 0) return;
+
+        const el = document.createElement('div');
+        el.className = 'jellyrate-tooltip';
+        ratings.slice().sort((a, b) => b.Rating - a.Rating).forEach(r => {
+            const line = document.createElement('div');
+            line.textContent = `${r.Rating}⭐ ${r.Username}`;
+            el.appendChild(line);
+        });
+        document.body.appendChild(el);
+
+        const rect = anchorEl.getBoundingClientRect();
+        const fitsAbove = rect.top >= el.offsetHeight + 8;
+        el.style.top = `${fitsAbove ? rect.top - el.offsetHeight - 6 : rect.bottom + 6}px`;
+        el.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - el.offsetWidth - 4))}px`;
+        entry.el = el;
+    }
+
+    function attachRatingsTooltip(anchorEl, loadRatings) {
+        anchorEl.classList.add('jellyrate-tooltip-anchor');
+        anchorEl.addEventListener('pointerenter', (e) => {
+            if (e.pointerType === 'mouse') showRatingsTooltip(anchorEl, loadRatings, true);
+        });
+        anchorEl.addEventListener('pointerleave', (e) => {
+            if (e.pointerType === 'mouse' && openTooltip?.anchor === anchorEl) closeRatingsTooltip();
+        });
+        // Click must not reach the card link underneath (would navigate instead of showing the popover)
+        anchorEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (openTooltip?.anchor !== anchorEl) showRatingsTooltip(anchorEl, loadRatings, false);
+            else if (!openTooltip.viaHover) closeRatingsTooltip();
+        });
+    }
+
+    document.addEventListener('click', closeRatingsTooltip);
+    window.addEventListener('scroll', closeRatingsTooltip, { capture: true, passive: true });
+    window.addEventListener('hashchange', closeRatingsTooltip);
 
     // ── Widget rendering ────────────────────────────────────
 
@@ -360,8 +405,6 @@
         }
         const statsDiv = document.createElement('div');
         statsDiv.className = 'jellyrate-stats';
-        statsDiv.style.position = 'relative';
-        statsDiv.style.cursor = 'default';
         container.appendChild(starsDiv);
         container.appendChild(statsDiv);
         return { starsDiv, statsDiv };
@@ -465,27 +508,7 @@
         updateStars(starsDiv, container._averageRating);
         updateStats(statsDiv, stats, cfg.MaxRating);
 
-        // Tooltip: show per-user ratings on stats hover
-        let tooltipEl = null;
-        let detailedCache = null;
-
-        statsDiv.addEventListener('mouseenter', async () => {
-            if (!detailedCache) {
-                try { detailedCache = await fetchDetailedRatings(itemId); } catch { return; }
-            }
-            if (!detailedCache || detailedCache.length === 0) return;
-            if (tooltipEl) tooltipEl.remove();
-            tooltipEl = document.createElement('div');
-            tooltipEl.className = 'jellyrate-tooltip';
-            tooltipEl.innerHTML = detailedCache
-                .map(d => `<div>${d.Rating}\u2B50 ${d.Username}</div>`)
-                .join('');
-            statsDiv.appendChild(tooltipEl);
-        });
-
-        statsDiv.addEventListener('mouseleave', () => {
-            if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
-        });
+        attachRatingsTooltip(statsDiv, () => fetchDetailedRatingsCached(itemId));
 
         // Star hover — preview selection
         starsDiv.addEventListener('mouseover', (e) => {
@@ -521,7 +544,6 @@
             try {
                 if (isToggle) { await deleteRating(itemId); } else { await submitRating(itemId, clickedValue); }
                 invalidateStatsCache();
-                detailedCache = null;
                 const freshStats = await fetchStats(itemId);
                 container._currentUserRating = freshStats?.UserRating ?? 0;
                 container._averageRating = Math.round(freshStats?.AverageRating ?? 0);
@@ -619,6 +641,7 @@
             const badge = document.createElement('div');
             badge.className = 'jellyrate-card-badge';
             badge.innerHTML = `<span class="star">\u2605</span> ${itemStats.AverageRating.toFixed(1)}`;
+            attachRatingsTooltip(badge, () => fetchDetailedRatingsCached(itemId));
             imgContainer.appendChild(badge);
         });
     }
@@ -728,22 +751,8 @@
         const year = item.ProductionYear ? `${item.ProductionYear} \u00b7 ` : '';
         sub.textContent = `${year}\u2605 ${avgRating.toFixed(1)} \u00b7 ${totalRatings} vote${totalRatings !== 1 ? 's' : ''}`;
 
-        // Tooltip on hover — per-user ratings
         if (userRatings && userRatings.length > 0) {
-            let tooltipEl = null;
-            sub.addEventListener('mouseenter', () => {
-                if (tooltipEl) tooltipEl.remove();
-                tooltipEl = document.createElement('div');
-                tooltipEl.className = 'jellyrate-card-tooltip';
-                tooltipEl.innerHTML = userRatings
-                    .slice().sort((a, b) => b.Rating - a.Rating)
-                    .map(r => `<div>${r.Rating}\u2B50 ${r.Username}</div>`)
-                    .join('');
-                sub.appendChild(tooltipEl);
-            });
-            sub.addEventListener('mouseleave', () => {
-                if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; }
-            });
+            attachRatingsTooltip(sub, async () => userRatings);
         }
 
         card.appendChild(sub);
