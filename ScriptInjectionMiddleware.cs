@@ -73,11 +73,8 @@ public class ScriptInjectionMiddleware
                 return;
             }
 
-            if (responseBody.Contains("jellyrate.js", StringComparison.OrdinalIgnoreCase))
-            {
-                await WriteOriginalResponse(memoryStream, originalBodyStream).ConfigureAwait(false);
-                return;
-            }
+            // The on-disk block may be stale (older token or tag): always swap in the current one
+            responseBody = ScriptInjector.BlockRegex.Replace(responseBody, string.Empty);
 
             var basePath = context.Request.PathBase.Value?.TrimEnd('/') ?? string.Empty;
 
@@ -96,7 +93,7 @@ public class ScriptInjectionMiddleware
             }
 
             var safeBasePath = System.Net.WebUtility.HtmlEncode(basePath);
-            var scriptTag = $"<script defer src=\"{safeBasePath}/Ratings/jellyrate.js\"></script>";
+            var injectionBlock = ScriptInjector.BuildBlock(safeBasePath);
 
             var bodyCloseIndex = responseBody.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             if (bodyCloseIndex == -1)
@@ -106,7 +103,7 @@ public class ScriptInjectionMiddleware
                 return;
             }
 
-            var modifiedBody = responseBody.Insert(bodyCloseIndex, scriptTag + "\n");
+            var modifiedBody = responseBody.Insert(bodyCloseIndex, injectionBlock);
             var modifiedBytes = Encoding.UTF8.GetBytes(modifiedBody);
 
             context.Response.Headers.Remove("Content-Length");

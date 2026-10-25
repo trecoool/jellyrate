@@ -13,6 +13,16 @@ public class ScriptInjector : IHostedService
     private const string BeginComment = "<!-- BEGIN JellyRate Plugin -->";
     private const string EndComment = "<!-- END JellyRate Plugin -->";
 
+    // Matches our block in index.html, so both injection layers replace it instead of stacking
+    public static readonly Regex BlockRegex = new(
+        Regex.Escape(BeginComment) + @"[\s\S]*?" + Regex.Escape(EndComment) + @"\s*");
+
+    public static string BuildBlock(string basePath)
+    {
+        var src = $"{basePath}/Ratings/web/{Plugin.CacheBustToken}/main.js";
+        return $"{BeginComment}\n<script type=\"module\" src=\"{src}\"></script>\n{EndComment}\n";
+    }
+
     public ScriptInjector(ILogger<ScriptInjector> logger, IApplicationPaths appPaths)
     {
         _logger = logger;
@@ -46,13 +56,9 @@ public class ScriptInjector : IHostedService
         try
         {
             var content = File.ReadAllText(indexPath);
-            var cleanupRegex = new Regex(
-                Regex.Escape(BeginComment) + @"[\s\S]*?" + Regex.Escape(EndComment) + @"\s*",
-                RegexOptions.Multiline);
-
-            if (cleanupRegex.IsMatch(content))
+            if (BlockRegex.IsMatch(content))
             {
-                content = cleanupRegex.Replace(content, string.Empty);
+                content = BlockRegex.Replace(content, string.Empty);
                 File.WriteAllText(indexPath, content);
                 _logger.LogInformation("JellyRate: Cleaned up old injection from index.html");
             }
@@ -82,8 +88,7 @@ public class ScriptInjector : IHostedService
                 return;
             }
 
-            var scriptTag = "<script defer src=\"/Ratings/jellyrate.js\"></script>";
-            var injectionBlock = $"{BeginComment}\n{scriptTag}\n{EndComment}\n";
+            var injectionBlock = BuildBlock(string.Empty);
 
             if (content.Contains("</body>", StringComparison.Ordinal))
             {

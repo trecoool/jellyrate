@@ -272,14 +272,28 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult GetScript()
     {
+        // Shim for index pages cached with the old classic tag: loads the current module tree
+        Response.Headers.CacheControl = "no-cache";
+        var shim = $"import(new URL('web/{Plugin.CacheBustToken}/main.js', document.currentScript.src).href);";
+        return Content(shim, "application/javascript");
+    }
+
+    // Token is only a cache key: any value serves the current modules
+    [HttpGet("web/{token}/{file}")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult GetModule([FromRoute] string token, [FromRoute] string file)
+    {
         var assembly = typeof(RatingsController).Assembly;
-        var resourceName = "JellyRate.Web.jellyrate.js";
-        var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
+        var resourceName = "JellyRate.Web." + file;
+        if (!file.EndsWith(".js", StringComparison.Ordinal)
+            || !assembly.GetManifestResourceNames().Contains(resourceName))
         {
             return NotFound();
         }
 
-        return File(stream, "application/javascript");
+        Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        return File(assembly.GetManifestResourceStream(resourceName)!, "application/javascript");
     }
 }

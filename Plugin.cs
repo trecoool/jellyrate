@@ -12,6 +12,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
     public static Plugin? Instance { get; private set; }
 
+    // Per-load token in the module URL path, so every restart busts the browser cache
+    public static readonly string CacheBustToken = Guid.NewGuid().ToString("N").Substring(0, 8);
+
     public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
         : base(applicationPaths, xmlSerializer)
     {
