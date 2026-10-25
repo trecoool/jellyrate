@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.2.0",
+        "changelog": "- User Rated button is back on Jellyfin 12: centered in the library toolbar row (mobile and desktop)\n- User Rated view shows native Jellyfin cards\n- Script updates reach the browser after a server restart, no hard reload needed (cache-busted ES modules)",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/trecoool/jellyrate/releases/download/v1.0.2.0/jellyrate_1.0.2.0.zip",
+        "checksum": "ed78724fc536c9f6fb221328cd409629",
+        "timestamp": "2026-10-25T02:09:45Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "- Library cards: hover a card to see who rated it and how; on mobile, tap the rating badge.\n- The rating badge stays visible on top of Jellyfin's dark hover overlay.\n- The per-user popover also opens on tap (item page, User Rated view) and lists ratings highest first.\n- Uses the standard Authorization header instead of the legacy X-Emby-Authorization.",
         "targetAbi": "10.11.6.0",
