@@ -244,22 +244,43 @@
                 border-bottom: 1px solid rgba(255,255,255,0.1);
             }
 
-            /* "User Rated" button on library pages */
+            /* "User Rated" button in the library AppBar row. The slot takes the free space
+               and the native sibling after it stops growing, so the button sits centered */
+            .jellyrate-rated-slot {
+                flex: 1 1 0;
+                min-width: 0;
+                display: flex;
+                justify-content: center;
+            }
+            .jellyrate-rated-slot + * {
+                flex-grow: 0 !important;
+            }
             .jellyrate-rated-btn {
-                display: block;
-                width: fit-content;
-                margin: 0.5em auto;
                 padding: 0.4em 1em;
                 background: none;
                 color: #e6c419;
-                border: none;
+                border: 1px solid transparent;
+                border-radius: 4px;
                 cursor: pointer;
                 font-size: 0.9em;
                 font-weight: bold;
                 font-family: inherit;
+                white-space: nowrap;
             }
             .jellyrate-rated-btn:hover {
                 opacity: 0.7;
+            }
+            .jellyrate-rated-btn.active {
+                background: rgba(230, 196, 25, 0.15);
+                border-color: rgba(230, 196, 25, 0.4);
+            }
+
+            /* Rated view: native page content hidden by a marker we own, React nodes untouched */
+            html[data-jellyrate-rated] .libraryPage > :not(#jellyrate-ratedView) {
+                display: none !important;
+            }
+            .jellyrate-rated-sections .itemsContainer {
+                margin-bottom: 1em;
             }
 
         `;
@@ -684,6 +705,12 @@
 
     // ── "User Rated" button on library pages ──────────────────
 
+    // jellyfin-web 12.3 webpack ids of the legacy cardBuilder module and its chunks.
+    // Ids hash the module path: stable across builds unless upstream moves the file.
+    const CARD_BUILDER_MODULE = 24468;
+    const CARD_BUILDER_CHUNKS = [45642, 24468, 66884];
+    const ITEMS_BATCH = 150;
+
     async function fetchRatedItems(userId, parentId) {
         const params = new URLSearchParams();
         if (userId) params.set('userId', userId);
@@ -692,11 +719,11 @@
         return apiFetch(`/Ratings/RatedItems${qs ? '?' + qs : ''}`);
     }
 
-    function isLibraryPage() {
-        const hash = location.hash.toLowerCase();
-        return hash.includes('movies') || hash.includes('list.html')
-            || hash.includes('music') || hash.includes('tvshows')
-            || hash.includes('homevideos');
+    // Rendered, not just present: JF12 keeps hidden legacy pages and headers in the DOM.
+    function isRendered(el) {
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
     }
 
     function getLibraryParentId() {
@@ -704,26 +731,56 @@
         return urlParams.get('topParentId');
     }
 
-    function removeRatedView() {
-        const view = document.getElementById('jellyrate-ratedView');
-        if (!view) return;
+    function findLibraryPage() {
+        if (!getLibraryParentId()) return null;
+        return Array.from(document.querySelectorAll('.libraryPage')).find(isRendered) || null;
+    }
 
-        // Restore siblings we hid
-        const parent = view.parentElement;
-        if (parent) {
-            parent.querySelectorAll('[data-jellyrate-hidden]').forEach(el => {
-                el.style.display = el.getAttribute('data-jellyrate-hidden');
-                el.removeAttribute('data-jellyrate-hidden');
-            });
+    let cardBuilderPromise = null;
+
+    // Borrows webpack's own require through a no-op chunk push, then finds the export by shape
+    function getCardBuilder() {
+        if (!cardBuilderPromise) {
+            cardBuilderPromise = (async () => {
+                let req = null;
+                self.webpackChunk?.push([[Symbol('jellyrate')], {}, r => { req = r; }]);
+                if (!req) return null;
+                await Promise.all(CARD_BUILDER_CHUNKS.map(id => req.e(id)));
+                return Object.values(req(CARD_BUILDER_MODULE)).find(x => typeof x?.buildCards === 'function') || null;
+            })().catch(() => null);
         }
-        view.remove();
+        return cardBuilderPromise;
+    }
+
+    // Full BaseItemDtos for cardBuilder, keyed by hyphenless id
+    async function fetchItemDtos(itemIds) {
+        const api = getApiClient();
+        const userId = api.getCurrentUserId();
+        const ids = itemIds.map(id => id.replace(/-/g, ''));
+        const dtos = new Map();
+        for (let i = 0; i < ids.length; i += ITEMS_BATCH) {
+            const result = await api.getItems(userId, {
+                Ids: ids.slice(i, i + ITEMS_BATCH).join(','),
+                Fields: 'PrimaryImageAspectRatio',
+                EnableTotalRecordCount: false
+            });
+            for (const dto of (result?.Items || [])) dtos.set(dto.Id.replace(/-/g, ''), dto);
+        }
+        return dtos;
     }
 
     // ── Rated view state ──────────────────────────────────
 
     let ratedViewItems = [];
+    let ratedViewDtos = null; // Map when native cards are available, else null (custom grid)
+    let ratedViewCardBuilder = null;
     let ratedViewAggregate = false;
     let ratedViewEnabledUsers = {}; // userId string -> bool
+
+    function removeRatedView() {
+        document.documentElement.removeAttribute('data-jellyrate-rated');
+        document.getElementById('jellyrate-ratedView')?.remove();
+    }
 
     function buildRatedCard(item, avgRating, totalRatings, userRatings) {
         const base = getBaseUrl();
@@ -752,8 +809,8 @@
 
         const sub = document.createElement('div');
         sub.className = 'jellyrate-rated-sub';
-        const year = item.ProductionYear ? `${item.ProductionYear} \u00b7 ` : '';
-        sub.textContent = `${year}\u2605 ${avgRating.toFixed(1)} \u00b7 ${totalRatings} vote${totalRatings !== 1 ? 's' : ''}`;
+        const year = item.ProductionYear ? `${item.ProductionYear} · ` : '';
+        sub.textContent = `${year}${ratingLine(avgRating, totalRatings)}`;
 
         if (userRatings && userRatings.length > 0) {
             attachRatingsTooltip(sub, async () => userRatings);
@@ -763,72 +820,104 @@
         return card;
     }
 
+    function ratingLine(rating, total) {
+        return `★ ${rating.toFixed(1)} · ${total} vote${total !== 1 ? 's' : ''}`;
+    }
+
     function getFilteredRatings(item) {
         return (item.UserRatings || []).filter(r => ratedViewEnabledUsers[r.UserId] !== false);
     }
 
-    function renderRatedGrid(container) {
-        let grid = container.querySelector('.jellyrate-rated-grid');
-        if (grid) grid.remove();
-        grid = document.createElement('div');
-        grid.className = 'jellyrate-rated-grid';
-
-        const items = ratedViewItems;
-        if (!items || items.length === 0) {
-            grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items in this library.</div>';
-            container.appendChild(grid);
-            return;
-        }
-
+    // [{ title, entries: [{ item, rating, total, ratings }] }] for the current mode and filters
+    function getRatedSections() {
         if (ratedViewAggregate) {
-            const filtered = [];
-            for (const item of items) {
+            const entries = [];
+            for (const item of ratedViewItems) {
                 const ratings = getFilteredRatings(item);
                 if (ratings.length === 0) continue;
                 const avg = ratings.reduce((s, r) => s + r.Rating, 0) / ratings.length;
-                filtered.push({ item, avg, total: ratings.length, ratings });
+                entries.push({ item, rating: avg, total: ratings.length, ratings });
             }
-            filtered.sort((a, b) => b.avg - a.avg);
-
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
-            } else {
-                for (const { item, avg, total, ratings } of filtered) {
-                    grid.appendChild(buildRatedCard(item, avg, total, ratings));
-                }
-            }
-        } else {
-            const userMap = new Map();
-            for (const item of items) {
-                for (const ur of (item.UserRatings || [])) {
-                    if (ratedViewEnabledUsers[ur.UserId] === false) continue;
-                    if (!userMap.has(ur.UserId)) {
-                        userMap.set(ur.UserId, { username: ur.Username, items: [] });
-                    }
-                    userMap.get(ur.UserId).items.push({ item, rating: ur.Rating });
-                }
-            }
-
-            const sortedUsers = [...userMap.entries()].sort((a, b) => a[1].username.localeCompare(b[1].username));
-
-            if (sortedUsers.length === 0) {
-                grid.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
-            } else {
-                for (const [, userData] of sortedUsers) {
-                    const header = document.createElement('div');
-                    header.className = 'jellyrate-user-section';
-                    header.textContent = userData.username;
-                    grid.appendChild(header);
-
-                    userData.items.sort((a, b) => b.rating - a.rating);
-                    for (const { item, rating } of userData.items) {
-                        grid.appendChild(buildRatedCard(item, rating, 1, [{ Username: userData.username, Rating: rating }]));
-                    }
-                }
-            }
+            entries.sort((a, b) => b.rating - a.rating);
+            return entries.length ? [{ title: null, entries }] : [];
         }
 
-        container.appendChild(grid);
+        const userMap = new Map();
+        for (const item of ratedViewItems) {
+            for (const ur of (item.UserRatings || [])) {
+                if (ratedViewEnabledUsers[ur.UserId] === false) continue;
+                if (!userMap.has(ur.UserId)) userMap.set(ur.UserId, { title: ur.Username, entries: [] });
+                userMap.get(ur.UserId).entries.push({
+                    item, rating: ur.Rating, total: 1, ratings: [{ Username: ur.Username, Rating: ur.Rating }]
+                });
+            }
+        }
+        const sections = [...userMap.values()].sort((a, b) => a.title.localeCompare(b.title));
+        for (const s of sections) s.entries.sort((a, b) => b.rating - a.rating);
+        return sections;
+    }
+
+    function appendSectionHeader(parent, title) {
+        const header = document.createElement('div');
+        header.className = 'jellyrate-user-section';
+        header.textContent = title;
+        parent.appendChild(header);
+    }
+
+    function renderNativeSections(wrapper, sections) {
+        for (const { title, entries } of sections) {
+            const shown = entries.filter(e => ratedViewDtos.has(e.item.ItemId.replace(/-/g, '')));
+            if (shown.length === 0) continue;
+            if (title) appendSectionHeader(wrapper, title);
+
+            const lines = new Map(shown.map(e => [e.item.ItemId.replace(/-/g, ''), ratingLine(e.rating, e.total)]));
+            const container = document.createElement('div');
+            container.className = 'itemsContainer vertical-wrap padded-left padded-right';
+            wrapper.appendChild(container); // buildCards skips containers not attached to the document
+
+            ratedViewCardBuilder.buildCards(shown.map(e => ratedViewDtos.get(e.item.ItemId.replace(/-/g, ''))), {
+                itemsContainer: container,
+                shape: 'auto',
+                showTitle: true,
+                showYear: true,
+                centerText: true,
+                coverImage: true,
+                overlayPlayButton: true,
+                textLines: dto => [lines.get(dto.Id.replace(/-/g, '')) || '']
+            });
+        }
+    }
+
+    // TODO: remove once native cards are verified on JF12
+    function renderCustomSections(wrapper, sections) {
+        const grid = document.createElement('div');
+        grid.className = 'jellyrate-rated-grid';
+        for (const { title, entries } of sections) {
+            if (title) appendSectionHeader(grid, title);
+            for (const { item, rating, total, ratings } of entries) {
+                grid.appendChild(buildRatedCard(item, rating, total, ratings));
+            }
+        }
+        wrapper.appendChild(grid);
+    }
+
+    function renderRatedGrid(container) {
+        container.querySelector('.jellyrate-rated-sections')?.remove();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'jellyrate-rated-sections';
+        container.appendChild(wrapper);
+
+        if (!ratedViewItems.length) {
+            wrapper.innerHTML = '<div class="jellyrate-rated-empty">No rated items in this library.</div>';
+            return;
+        }
+        const sections = getRatedSections();
+        if (!sections.length) {
+            wrapper.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
+            return;
+        }
+        if (ratedViewDtos) renderNativeSections(wrapper, sections);
+        else renderCustomSections(wrapper, sections);
     }
 
     function renderRatedToolbar(container) {
@@ -894,28 +983,24 @@
         container.insertBefore(toolbar, container.firstChild);
     }
 
-    async function showRatedView(parentId) {
+    async function showRatedView(page, parentId) {
         removeRatedView();
-
-        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
-        if (!activeTab) return;
-
-        // Hide all native siblings (button, filter bar, card grid) within this tab
-        Array.from(activeTab.children).forEach(child => {
-            if (child.id !== 'jellyrate-ratedView') {
-                child.setAttribute('data-jellyrate-hidden', child.style.display || '');
-                child.style.display = 'none';
-            }
-        });
 
         const view = document.createElement('div');
         view.id = 'jellyrate-ratedView';
         view.innerHTML = '<div class="jellyrate-rated-empty">Loading...</div>';
-        activeTab.appendChild(view);
+        page.appendChild(view);
+        document.documentElement.setAttribute('data-jellyrate-rated', '');
 
         try {
             const items = await fetchRatedItems(null, parentId);
             ratedViewItems = items || [];
+            ratedViewCardBuilder = await getCardBuilder();
+            ratedViewDtos = null;
+            if (ratedViewCardBuilder && ratedViewItems.length) {
+                ratedViewDtos = await fetchItemDtos(ratedViewItems.map(i => i.ItemId)).catch(() => null);
+            }
+            if (!view.isConnected) return;
             ratedViewAggregate = false;
             ratedViewEnabledUsers = {};
             view.innerHTML = '';
@@ -926,67 +1011,108 @@
         }
     }
 
-    async function tryInjectRatedButton() {
-        if (!isLibraryPage()) return;
-        const cfg = await fetchConfig();
-        if (!cfg || cfg.DisableUserRatedTab) return;
+    // Toolbar row under the AppBar holding the library view dropdown:
+    // [dropdown] [count box] [play/sort stack]. Count box is row-reverse on narrow screens.
+    function findLibraryToolbarAnchors() {
+        const dropdown = Array.from(document.querySelectorAll('button[aria-controls="library-view-menu"]'))
+            .find(el => isRendered(el) && !el.closest('.osdHeader'));
+        if (!dropdown || !dropdown.parentElement) return null;
+        let countBox = dropdown.nextElementSibling;
+        if (countBox?.classList.contains('jellyrate-rated-slot')) countBox = countBox.nextElementSibling;
+        return { toolbar: dropdown.parentElement, dropdown, countBox };
+    }
 
-        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
-        if (!activeTab) return;
-        if (activeTab.querySelector('.jellyrate-rated-btn')) return;
+    // Narrow: between dropdown and count (count is pushed right). Wide: after the count,
+    // before the play/sort stack. Moves only when misplaced, so our own mutation settles.
+    function placeRatedSlot(slot, anchors) {
+        const { toolbar, dropdown, countBox } = anchors;
+        if (!countBox) {
+            if (slot.previousElementSibling !== dropdown || slot.parentElement !== toolbar) dropdown.after(slot);
+            return;
+        }
+        const narrow = getComputedStyle(countBox).flexDirection === 'row-reverse';
+        if (narrow && slot.nextElementSibling !== countBox) countBox.before(slot);
+        else if (!narrow && slot.previousElementSibling !== countBox) countBox.after(slot);
+    }
 
-        // Only show button if there are rated items anywhere
-        try {
-            const stats = await fetchAllStats();
-            if (!stats || Object.keys(stats).length === 0) return;
-        } catch { return; }
-
+    function createRatedSlot() {
+        const slot = document.createElement('div');
+        slot.className = 'jellyrate-rated-slot';
         const btn = document.createElement('button');
         btn.className = 'jellyrate-rated-btn';
         btn.type = 'button';
-        btn.textContent = '\u2B50 User Rated';
-
-        // Insert before .itemsContainer (between filter bar and content grid)
-        const itemsContainer = activeTab.querySelector('.itemsContainer');
-        if (itemsContainer) {
-            itemsContainer.parentElement.insertBefore(btn, itemsContainer);
-        } else {
-            activeTab.insertBefore(btn, activeTab.firstChild);
-        }
-
+        btn.textContent = '⭐ User Rated';
         btn.addEventListener('click', () => {
-            const parentId = getLibraryParentId();
-            history.pushState({ jellyrate: 'rated', parentId }, '');
-            showRatedView(parentId);
+            if (history.state?.jellyrate === 'rated') { history.back(); return; }
+            // Keep react-router's own state (idx, key) so its back/forward deltas stay correct
+            history.pushState({ ...history.state, jellyrate: 'rated', parentId: getLibraryParentId() }, '');
+            scheduleRatedSync();
         });
+        slot.appendChild(btn);
+        return slot;
     }
 
-    // Single polling function — checks every POLL_INTERVAL whether button
-    // needs injection and whether rated view should be shown/hidden.
-    // Self-healing: if DOM isn't ready, just retries next tick.
-    async function checkRatedButton() {
-        if (!isLibraryPage()) {
-            removeRatedView();
-            return;
+    // Enabled in config and at least one rating exists (stats are cached for a minute)
+    async function isRatedFeatureEnabled() {
+        try {
+            const cfg = await fetchConfig();
+            if (!cfg || cfg.DisableUserRatedTab) return false;
+            const stats = await fetchAllStats();
+            return !!stats && Object.keys(stats).length > 0;
+        } catch { return false; }
+    }
+
+    let ratedSyncRunning = false;
+    let ratedSyncPending = false;
+
+    // Single reconcile pass: slot placement + rated view shown iff history state says so
+    async function syncRatedUi() {
+        if (ratedSyncRunning) { ratedSyncPending = true; return; }
+        ratedSyncRunning = true;
+        try {
+            const page = findLibraryPage();
+            if (!page || !(await isRatedFeatureEnabled())) {
+                removeRatedView();
+                document.querySelector('.jellyrate-rated-slot')?.remove();
+                return;
+            }
+
+            const anchors = findLibraryToolbarAnchors();
+            let slot = document.querySelector('.jellyrate-rated-slot');
+            if (anchors) {
+                if (!slot) slot = createRatedSlot();
+                placeRatedSlot(slot, anchors);
+            }
+
+            const shouldShow = history.state?.jellyrate === 'rated';
+            const view = document.getElementById('jellyrate-ratedView');
+            slot?.firstChild.classList.toggle('active', shouldShow);
+
+            if (shouldShow && (!view || view.parentElement !== page)) {
+                showRatedView(page, history.state.parentId);
+            } else if (!shouldShow && view) {
+                removeRatedView();
+            }
+        } finally {
+            ratedSyncRunning = false;
+            if (ratedSyncPending) { ratedSyncPending = false; scheduleRatedSync(); }
         }
+    }
 
-        const activeTab = document.querySelector('.page:not(.hide) .pageTabContent:not(.hide)');
-        if (!activeTab) return;
+    let ratedSyncScheduled = false;
 
-        // Inject button if missing
-        if (!activeTab.querySelector('.jellyrate-rated-btn')) {
-            await tryInjectRatedButton();
-        }
+    function scheduleRatedSync() {
+        if (ratedSyncScheduled) return;
+        ratedSyncScheduled = true;
+        requestAnimationFrame(() => { ratedSyncScheduled = false; syncRatedUi(); });
+    }
 
-        // Show or hide rated view based on history state
-        const shouldShow = history.state?.jellyrate === 'rated';
-        const isShown = !!document.getElementById('jellyrate-ratedView');
-
-        if (shouldShow && !isShown) {
-            showRatedView(history.state.parentId);
-        } else if (!shouldShow && isShown) {
-            removeRatedView();
-        }
+    // The AppBar and library page are React subtrees that remount on navigation
+    function watchRatedUi() {
+        new MutationObserver(scheduleRatedSync).observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('popstate', scheduleRatedSync);
+        window.addEventListener('resize', scheduleRatedSync);
+        scheduleRatedSync();
     }
 
     // ── SPA Navigation Detection ────────────────────────────
@@ -1022,19 +1148,8 @@
         setupCardObserver();
         scheduleCardProcessing();
 
-        // "User Rated" button — poll + event-driven checks
-        window.addEventListener('hashchange', checkRatedButton);
-        window.addEventListener('popstate', checkRatedButton);
-        setInterval(checkRatedButton, POLL_INTERVAL);
-        checkRatedButton();
-
-        // Any tab button click exits rated view (delegated — works even if tab strip rebuilds)
-        document.addEventListener('click', (e) => {
-            if (document.getElementById('jellyrate-ratedView') && e.target.closest('.emby-tab-button')) {
-                history.replaceState(null, '');
-                removeRatedView();
-            }
-        });
+        // "User Rated" button in the library AppBar row + rated view
+        watchRatedUi();
     }
 
     function waitForApiClient() {
