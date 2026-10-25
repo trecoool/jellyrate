@@ -119,51 +119,6 @@
             }
 
             /* User Rated view content */
-            .jellyrate-rated-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                padding: 1em;
-                gap: 1em;
-            }
-            .jellyrate-rated-card {
-                cursor: pointer;
-                text-decoration: none;
-                color: inherit;
-                transition: transform 0.15s;
-            }
-            .jellyrate-rated-card:hover {
-                transform: scale(1.04);
-            }
-            .jellyrate-rated-poster {
-                width: 100%;
-                aspect-ratio: 2 / 3;
-                border-radius: 4px;
-                object-fit: cover;
-                background: #1a1a1a;
-            }
-            .jellyrate-rated-poster.no-image {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: rgba(255,255,255,0.3);
-                font-size: 0.85em;
-                text-align: center;
-                padding: 1em;
-            }
-            .jellyrate-rated-title {
-                margin-top: 6px;
-                font-size: 0.9em;
-                line-height: 1.3;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .jellyrate-rated-sub {
-                font-size: 0.8em;
-                color: rgba(255,255,255,0.5);
-                position: relative;
-                cursor: default;
-            }
             .jellyrate-rated-empty {
                 padding: 2em;
                 color: rgba(255,255,255,0.5);
@@ -235,7 +190,6 @@
 
             /* By-user section headers */
             .jellyrate-user-section {
-                grid-column: 1 / -1;
                 padding: 0.5em 1em;
                 margin-top: 0.5em;
                 font-size: 1em;
@@ -772,7 +726,7 @@
     // ── Rated view state ──────────────────────────────────
 
     let ratedViewItems = [];
-    let ratedViewDtos = null; // Map when native cards are available, else null (custom grid)
+    let ratedViewDtos = new Map(); // hyphenless id -> BaseItemDto
     let ratedViewCardBuilder = null;
     let ratedViewAggregate = false;
     let ratedViewEnabledUsers = {}; // userId string -> bool
@@ -780,44 +734,6 @@
     function removeRatedView() {
         document.documentElement.removeAttribute('data-jellyrate-rated');
         document.getElementById('jellyrate-ratedView')?.remove();
-    }
-
-    function buildRatedCard(item, avgRating, totalRatings, userRatings) {
-        const base = getBaseUrl();
-        const card = document.createElement('a');
-        card.className = 'jellyrate-rated-card';
-        card.href = `#!/details?id=${item.ItemId}`;
-
-        if (item.HasPrimaryImage) {
-            const img = document.createElement('img');
-            img.className = 'jellyrate-rated-poster';
-            img.src = `${base}/Items/${item.ItemId}/Images/Primary?maxHeight=450&quality=90`;
-            img.alt = item.Name;
-            img.loading = 'lazy';
-            card.appendChild(img);
-        } else {
-            const placeholder = document.createElement('div');
-            placeholder.className = 'jellyrate-rated-poster no-image';
-            placeholder.textContent = item.Name;
-            card.appendChild(placeholder);
-        }
-
-        const title = document.createElement('div');
-        title.className = 'jellyrate-rated-title';
-        title.textContent = item.Name;
-        card.appendChild(title);
-
-        const sub = document.createElement('div');
-        sub.className = 'jellyrate-rated-sub';
-        const year = item.ProductionYear ? `${item.ProductionYear} · ` : '';
-        sub.textContent = `${year}${ratingLine(avgRating, totalRatings)}`;
-
-        if (userRatings && userRatings.length > 0) {
-            attachRatingsTooltip(sub, async () => userRatings);
-        }
-
-        card.appendChild(sub);
-        return card;
     }
 
     function ratingLine(rating, total) {
@@ -888,19 +804,6 @@
         }
     }
 
-    // TODO: remove once native cards are verified on JF12
-    function renderCustomSections(wrapper, sections) {
-        const grid = document.createElement('div');
-        grid.className = 'jellyrate-rated-grid';
-        for (const { title, entries } of sections) {
-            if (title) appendSectionHeader(grid, title);
-            for (const { item, rating, total, ratings } of entries) {
-                grid.appendChild(buildRatedCard(item, rating, total, ratings));
-            }
-        }
-        wrapper.appendChild(grid);
-    }
-
     function renderRatedGrid(container) {
         container.querySelector('.jellyrate-rated-sections')?.remove();
         const wrapper = document.createElement('div');
@@ -916,8 +819,7 @@
             wrapper.innerHTML = '<div class="jellyrate-rated-empty">No rated items match the current filters.</div>';
             return;
         }
-        if (ratedViewDtos) renderNativeSections(wrapper, sections);
-        else renderCustomSections(wrapper, sections);
+        renderNativeSections(wrapper, sections);
     }
 
     function renderRatedToolbar(container) {
@@ -996,10 +898,8 @@
             const items = await fetchRatedItems(null, parentId);
             ratedViewItems = items || [];
             ratedViewCardBuilder = await getCardBuilder();
-            ratedViewDtos = null;
-            if (ratedViewCardBuilder && ratedViewItems.length) {
-                ratedViewDtos = await fetchItemDtos(ratedViewItems.map(i => i.ItemId)).catch(() => null);
-            }
+            if (!ratedViewCardBuilder) throw new Error('Jellyfin card renderer not found');
+            ratedViewDtos = await fetchItemDtos(ratedViewItems.map(i => i.ItemId));
             if (!view.isConnected) return;
             ratedViewAggregate = false;
             ratedViewEnabledUsers = {};
