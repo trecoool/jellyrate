@@ -10,6 +10,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     public void RegisterServices(IServiceCollection services, IServerApplicationHost appHost)
     {
+        services.AddSingleton<ItemKeyResolver>();
         services.AddSingleton<RatingsRepository>();
         services.AddSingleton<IStartupFilter, ScriptInjectionStartupFilter>();
         services.AddHostedService<ScriptInjector>();

@@ -21,17 +21,20 @@ namespace JellyRate.Api;
 public class RatingsController : ControllerBase
 {
     private readonly RatingsRepository _repository;
+    private readonly ItemKeyResolver _keyResolver;
     private readonly IUserManager _userManager;
     private readonly ILibraryManager _libraryManager;
     private readonly IAuthorizationContext _authContext;
 
     public RatingsController(
         RatingsRepository repository,
+        ItemKeyResolver keyResolver,
         IUserManager userManager,
         ILibraryManager libraryManager,
         IAuthorizationContext authContext)
     {
         _repository = repository;
+        _keyResolver = keyResolver;
         _userManager = userManager;
         _libraryManager = libraryManager;
         _authContext = authContext;
@@ -62,15 +65,29 @@ public class RatingsController : ControllerBase
             return BadRequest($"Rating must be between {config.MinRating} and {config.MaxRating}");
         }
 
+        var itemKey = _keyResolver.GetKey(itemId);
+        if (itemKey == null)
+        {
+            return BadRequest("Only movies and series can be rated");
+        }
+
         var userId = await GetUserIdAsync().ConfigureAwait(false);
-        var result = await _repository.SetRatingAsync(userId, itemId, rating).ConfigureAwait(false);
+        var result = await _repository.SetRatingAsync(userId, itemKey, itemId, rating).ConfigureAwait(false);
         return Ok(result);
     }
 
     [HttpGet("Items/{itemId}/Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RatingStats>> GetStats([FromRoute] Guid itemId)
     {
+        // 404 tells the frontend the item is not ratable
+        var itemKey = _keyResolver.GetKey(itemId);
+        if (itemKey == null)
+        {
+            return NotFound();
+        }
+
         Guid? userId = null;
         try
         {
@@ -85,7 +102,7 @@ public class RatingsController : ControllerBase
             // Not authenticated, that's fine
         }
 
-        var stats = _repository.GetRatingStats(itemId, userId);
+        var stats = _repository.GetRatingStats(itemKey, itemId, userId);
         return Ok(stats);
     }
 
@@ -95,8 +112,9 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserRating>> GetUserRating([FromRoute] Guid itemId)
     {
+        var itemKey = _keyResolver.GetKey(itemId);
         var userId = await GetUserIdAsync().ConfigureAwait(false);
-        var rating = _repository.GetUserRating(userId, itemId);
+        var rating = itemKey == null ? null : _repository.GetUserRating(userId, itemKey);
         if (rating == null)
         {
             return NotFound();
@@ -130,8 +148,14 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteRating([FromRoute] Guid itemId)
     {
+        var itemKey = _keyResolver.GetKey(itemId);
+        if (itemKey == null)
+        {
+            return NotFound();
+        }
+
         var userId = await GetUserIdAsync().ConfigureAwait(false);
-        var deleted = await _repository.DeleteRatingAsync(userId, itemId).ConfigureAwait(false);
+        var deleted = await _repository.DeleteRatingAsync(userId, itemKey).ConfigureAwait(false);
         if (!deleted)
         {
             return NotFound();
@@ -144,7 +168,8 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<List<UserRatingDetail>> GetDetailedRatings([FromRoute] Guid itemId)
     {
-        var ratings = _repository.GetItemRatings(itemId);
+        var itemKey = _keyResolver.GetKey(itemId);
+        var ratings = itemKey == null ? new List<UserRating>() : _repository.GetItemRatings(itemKey);
         var details = ratings
             .Select(r =>
             {
@@ -168,11 +193,15 @@ public class RatingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult GetAllStats()
     {
-        var stats = _repository.GetAllItemStats();
-        var result = stats.ToDictionary(
-            kvp => kvp.Key.ToString(),
-            kvp => new { kvp.Value.AverageRating, kvp.Value.TotalRatings }
-        );
+        var result = new Dictionary<string, object>();
+        foreach (var (itemKey, stats) in _repository.GetAllItemStats())
+        {
+            if (_keyResolver.ResolveId(itemKey) is { } itemId)
+            {
+                result[itemId.ToString()] = new { stats.AverageRating, stats.TotalRatings };
+            }
+        }
+
         return Ok(result);
     }
 
@@ -183,22 +212,26 @@ public class RatingsController : ControllerBase
         var allStats = _repository.GetAllItemStats();
 
         // If filtering by user, only include items that user has rated
-        HashSet<Guid>? userItemIds = null;
+        HashSet<string>? userItemKeys = null;
         if (userId.HasValue)
         {
-            userItemIds = _repository.GetUserRatings(userId.Value)
-                .Select(r => r.ItemId)
+            userItemKeys = _repository.GetUserRatings(userId.Value)
+                .Select(RatingsRepository.KeyOf)
                 .ToHashSet();
         }
 
         var results = new List<RatedItemDto>();
-        foreach (var (itemId, stats) in allStats)
+        foreach (var (itemKey, stats) in allStats)
         {
-            if (userItemIds != null && !userItemIds.Contains(itemId))
+            if (userItemKeys != null && !userItemKeys.Contains(itemKey))
                 continue;
 
+            if (_keyResolver.ResolveId(itemKey) is not { } itemId)
+                continue;
+
+            // Skips vanished items and legacy ratings on non-movie/series items
             var item = _libraryManager.GetItemById(itemId);
-            if (item == null)
+            if (item == null || ItemKeyResolver.GetKey(item) == null)
                 continue;
 
             // Filter by library — topParentId from URL may be a UserView or CollectionFolder
@@ -223,7 +256,7 @@ public class RatingsController : ControllerBase
                     continue;
             }
 
-            var itemRatings = _repository.GetItemRatings(itemId);
+            var itemRatings = _repository.GetItemRatings(itemKey);
             var userRatings = itemRatings.Select(r =>
             {
                 var user = _userManager.GetUserById(r.UserId);

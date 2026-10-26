@@ -115,7 +115,8 @@ export async function handleDetailPage(itemId, attempt = 0) {
     try {
         stats = await fetchStats(itemId);
     } catch {
-        statsDiv.textContent = '';
+        // Not ratable (only movies and series are) or server unreachable
+        row.remove();
         return;
     }
 

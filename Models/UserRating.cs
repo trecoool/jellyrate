@@ -8,7 +8,10 @@ public class UserRating
 
     public Guid UserId { get; set; }
 
+    // Last known Jellyfin id; ItemKey is the identity
     public Guid ItemId { get; set; }
+
+    public string? ItemKey { get; set; }
 
     public int Rating { get; set; }
 
