@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using JellyRate.Configuration;
 using JellyRate.Data;
 using JellyRate.Models;
+using MediaBrowser.Controller.Entities.Movies;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Model.Entities;
@@ -68,7 +70,7 @@ public class RatingsController : ControllerBase
         var itemKey = _keyResolver.GetKey(itemId);
         if (itemKey == null)
         {
-            return BadRequest("Only movies and series can be rated");
+            return BadRequest("Only movies, series, episodes and persons can be rated");
         }
 
         var userId = await GetUserIdAsync().ConfigureAwait(false);
@@ -229,9 +231,9 @@ public class RatingsController : ControllerBase
             if (_keyResolver.ResolveId(itemKey) is not { } itemId)
                 continue;
 
-            // Skips vanished items and legacy ratings on non-movie/series items
+            // The view lists movies and series only; persons and episodes are rated on their detail page
             var item = _libraryManager.GetItemById(itemId);
-            if (item == null || ItemKeyResolver.GetKey(item) == null)
+            if (item is not (Movie or Series))
                 continue;
 
             // Filter by library — topParentId from URL may be a UserView or CollectionFolder
